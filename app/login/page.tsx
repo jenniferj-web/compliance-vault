@@ -4,165 +4,153 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-// ─── Inline styles & animations ──────────────────────────────────────────────
+// ─── Styles & animations ──────────────────────────────────────────────────────
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
 
-  .login-root { font-family: 'DM Mono', 'Courier New', monospace; }
-  .display-font { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .font-display { font-family: 'Syne', sans-serif; }
+  .font-mono-ui { font-family: 'IBM Plex Mono', monospace; }
 
-  @keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(22px); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+  @keyframes bgFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes scanMove {
+    0%   { transform: translateY(-100%); }
+    100% { transform: translateY(110vh); }
   }
-  @keyframes shimmer {
-    0%   { background-position: -600px 0; }
-    100% { background-position: 600px 0; }
-  }
-  @keyframes scanline {
-    0%   { transform: translateY(-100%); opacity: 1; }
-    100% { transform: translateY(100vh); opacity: 0; }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  @keyframes spinRing { to { transform: rotate(360deg); } }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%,60%  { transform: translateX(-5px); }
+    40%,80%  { transform: translateX(5px); }
   }
 
-  .anim-1 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.05s both; }
-  .anim-2 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.2s  both; }
-  .anim-3 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.35s both; }
-  .anim-4 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.5s  both; }
-  .anim-5 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.65s both; }
-  .anim-6 { animation: fadeSlideUp 0.75s cubic-bezier(0.22,1,0.36,1) 0.75s both; }
-
-  .bg-fade { animation: fadeIn 1.4s ease both; }
-
-  .gold-shimmer {
-    background: linear-gradient(90deg, #7a6a4a 0%, #c8aa72 30%, #e8d5a3 50%, #c8aa72 70%, #7a6a4a 100%);
-    background-size: 600px 100%;
-    animation: shimmer 3.5s ease-in-out infinite;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
+  .a1 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .06s  both; }
+  .a2 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .18s  both; }
+  .a3 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .30s  both; }
+  .a4 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .42s  both; }
+  .a5 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .54s  both; }
+  .a6 { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) .64s  both; }
+  .bg-in { animation: bgFade 1.2s ease both; }
 
   .scanline-el {
-    position: fixed; top: 0; left: 0; right: 0;
-    height: 200px;
-    background: linear-gradient(to bottom, transparent 0%, rgba(180,158,110,0.018) 50%, transparent 100%);
-    animation: scanline 10s ease-in-out infinite;
+    position: fixed; top: 0; left: 0; right: 0; height: 180px;
+    background: linear-gradient(to bottom,
+      transparent, rgba(59,130,246,.022) 50%, transparent);
+    animation: scanMove 14s linear infinite;
     pointer-events: none; z-index: 1;
   }
 
-  .noise-bg {
-    position: fixed; inset: 0;
-    opacity: 0.022;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 150px 150px;
+  .noise-el {
+    position: fixed; inset: 0; opacity: .016;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
     pointer-events: none; z-index: 2;
   }
 
-  .gold-input {
-    background: rgba(180,158,110,0.04);
-    border: 1px solid rgba(180,158,110,0.18);
-    color: #e8d9c4;
-    transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
-    caret-color: #c8aa72;
+  .vault-input {
+    background: rgba(15,23,42,.6);
+    border: 1px solid rgba(51,65,85,.7);
+    color: #e2e8f0;
+    transition: border-color .2s, background .2s, box-shadow .2s;
+    caret-color: #3b82f6;
     outline: none;
+    width: 100%;
+    box-sizing: border-box;
   }
-  .gold-input::placeholder { color: rgba(180,158,110,0.28); }
-  .gold-input:focus {
-    border-color: rgba(180,158,110,0.65);
-    background: rgba(180,158,110,0.07);
-    box-shadow: 0 0 0 4px rgba(180,158,110,0.07), inset 0 1px 0 rgba(255,255,255,0.04);
+  .vault-input::placeholder { color: rgba(100,116,139,.55); }
+  .vault-input:focus {
+    border-color: rgba(59,130,246,.65);
+    background: rgba(15,23,42,.85);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  }
+  .vault-input:-webkit-autofill,
+  .vault-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #0f1729 inset !important;
+    -webkit-text-fill-color: #e2e8f0 !important;
   }
 
-  .gold-btn {
-    background: linear-gradient(135deg, #c8aa72 0%, #a08650 35%, #c8aa72 65%, #a08650 100%);
-    background-size: 300% 100%;
-    background-position: 0% 0;
-    color: #12100a;
-    transition: background-position 0.5s ease, box-shadow 0.25s ease, transform 0.15s ease;
-    box-shadow: 0 4px 28px rgba(180,158,110,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+  .vault-btn {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 45%, #2563eb 100%);
+    background-size: 200% 100%;
+    background-position: 0 0;
+    box-shadow: 0 4px 24px rgba(37,99,235,.35), inset 0 1px 0 rgba(255,255,255,.1);
+    transition: background-position .4s ease, box-shadow .25s, transform .15s;
   }
-  .gold-btn:hover:not(:disabled) {
+  .vault-btn:hover:not(:disabled) {
     background-position: 100% 0;
-    box-shadow: 0 6px 36px rgba(180,158,110,0.38), inset 0 1px 0 rgba(255,255,255,0.25);
+    box-shadow: 0 8px 36px rgba(37,99,235,.55), inset 0 1px 0 rgba(255,255,255,.15);
     transform: translateY(-1px);
   }
-  .gold-btn:active:not(:disabled) { transform: translateY(0px); }
-  .gold-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .vault-btn:active:not(:disabled) { transform: translateY(0); }
+  .vault-btn:disabled { opacity: .45; cursor: not-allowed; }
 
-  .corner { position: absolute; width: 14px; height: 14px; border-color: rgba(180,158,110,0.35); border-style: solid; }
-  .c-tl { top: 0;  left: 0;  border-width: 1px 0 0 1px; }
-  .c-tr { top: 0;  right: 0; border-width: 1px 1px 0 0; }
-  .c-bl { bottom: 0; left: 0;  border-width: 0 0 1px 1px; }
-  .c-br { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+  .spin-ring { animation: spinRing .8s linear infinite; }
+  .do-shake  { animation: shake .35s ease both; }
 
-  .eye-btn { background: none; border: none; cursor: pointer; padding: 0; color: rgba(180,158,110,0.35); transition: color 0.2s; }
-  .eye-btn:hover { color: rgba(180,158,110,0.75); }
-
-  .link-gold { color: rgba(180,158,110,0.35); text-decoration: none; transition: color 0.2s; letter-spacing: 0.18em; text-transform: uppercase; font-size: 10px; }
-  .link-gold:hover { color: rgba(180,158,110,0.75); }
-
-  .error-box {
-    background: rgba(200,60,50,0.06);
-    border: 1px solid rgba(200,60,50,0.22);
-    color: rgba(240,148,140,0.9);
-    animation: fadeSlideUp 0.3s ease both;
+  .eye-btn {
+    background: none; border: none; cursor: pointer; padding: 0;
+    color: rgba(100,116,139,.55);
+    transition: color .15s;
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   }
+  .eye-btn:hover { color: rgba(148,163,184,.9); }
 
-  .divider-gold {
-    flex: 1; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(180,158,110,0.18), transparent);
+  .divider { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(51,65,85,.6), transparent); }
+
+  .link-sm {
+    font-size: 10px; letter-spacing: .08em;
+    color: rgba(59,130,246,.7); text-decoration: none;
+    transition: color .15s;
   }
-
-  .spinner { animation: spin 0.9s linear infinite; }
+  .link-sm:hover { color: rgba(96,165,250,1); }
 `;
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-const IconLock = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-  </svg>
-);
-const IconMail = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-    <polyline points="22,6 12,13 2,6"/>
-  </svg>
-);
-const IconEyeOpen = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-    <circle cx="12" cy="12" r="3"/>
-  </svg>
-);
-const IconEyeClosed = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-    <line x1="1" y1="1" x2="23" y2="23"/>
-  </svg>
-);
-const IconAlert = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0,marginTop:"1px"}}>
-    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-  </svg>
-);
 const IconShield = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-    <polyline points="9,12 11,14 15,10"/>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.955 11.955 0 0 0 3 11.965C3 18.033 7.373 22.5 12 22.5s9-4.467 9-10.535c0-2.152-.623-4.157-1.698-5.858A11.94 11.94 0 0 1 12 2.715z" />
   </svg>
 );
-const IconSpinner = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="spinner">
-    <path d="M21 12a9 9 0 1 1-6.22-8.56" strokeLinecap="round"/>
+
+const IconMail = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+  </svg>
+);
+
+const IconLock = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25z" />
+  </svg>
+);
+
+const IconEyeOpen = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
+  </svg>
+);
+
+const IconEyeClosed = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+  </svg>
+);
+
+const IconAlert = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+    style={{ flexShrink: 0, marginTop: "1px" }}>
+    <path strokeLinecap="round" strokeLinejoin="round"
+      d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9 3.75h.008v.008H12v-.008z" />
   </svg>
 );
 
@@ -174,42 +162,45 @@ export default function LoginPage() {
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
+  const [showPw,   setShowPw]   = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
   const [mounted,  setMounted]  = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Already logged in → go straight to dashboard
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.replace("/dashboard");
     });
-    const t = setTimeout(() => emailRef.current?.focus(), 900);
+    const t = setTimeout(() => emailRef.current?.focus(), 800);
     return () => clearTimeout(t);
   }, [supabase, router]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
     setError(null);
     setLoading(true);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email:    email.trim().toLowerCase(),
       password,
     });
 
     if (authError) {
-      setError(
-        authError.message.toLowerCase().includes("invalid")
-          ? "The credentials you entered are incorrect."
-          : authError.message
-      );
+      const msg = authError.message.toLowerCase().includes("invalid")
+        ? "Incorrect email or password. Please try again."
+        : authError.message;
+      setError(msg);
+      setShakeKey(k => k + 1);
       setLoading(false);
       return;
     }
 
+    // ✓ Success — redirect to dashboard
     router.replace("/dashboard");
   };
 
@@ -219,129 +210,130 @@ export default function LoginPage() {
     <>
       <style>{STYLES}</style>
 
-      {/* Atmospheric FX */}
+      {/* Atmospheric layers */}
       <div className="scanline-el" aria-hidden="true" />
-      <div className="noise-bg" aria-hidden="true" />
+      <div className="noise-el"    aria-hidden="true" />
 
-      {/* Page */}
       <div
-        className="login-root bg-fade min-h-screen flex flex-col items-center justify-center px-4"
+        className="font-mono-ui bg-in min-h-screen flex flex-col items-center justify-center px-4"
         style={{
           background:
-            "radial-gradient(ellipse 90% 65% at 50% -5%, #1c1708 0%, #0e0d0b 50%, #070706 100%)",
+            "radial-gradient(ellipse 110% 70% at 50% -8%, #0d1829 0%, #090e1a 45%, #050709 100%)",
         }}
       >
-        {/* Background grid */}
+        {/* Grid */}
         <div
           aria-hidden="true"
-          className="fixed inset-0 pointer-events-none select-none"
+          className="fixed inset-0 pointer-events-none"
           style={{
             backgroundImage:
-              "linear-gradient(rgba(180,158,110,0.035) 1px, transparent 1px)," +
-              "linear-gradient(90deg, rgba(180,158,110,0.035) 1px, transparent 1px)",
-            backgroundSize: "56px 56px",
+              "linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px)," +
+              "linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px)",
+            backgroundSize: "50px 50px",
           }}
         />
-
         {/* Deep vignette */}
         <div
           aria-hidden="true"
           className="fixed inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 30%, rgba(0,0,0,0.65) 100%)",
+              "radial-gradient(ellipse 75% 75% at 50% 50%, transparent 30%, rgba(0,0,0,.65) 100%)",
           }}
         />
 
         {/* ── Card ── */}
         <div className="relative z-10 w-full" style={{ maxWidth: "400px" }}>
 
-          {/* Outer border frame */}
+          {/* Outer gradient ring */}
           <div
-            className="relative p-px"
-            style={{ border: "1px solid rgba(180,158,110,0.1)" }}
+            className="absolute -inset-px pointer-events-none"
+            style={{
+              borderRadius: "18px",
+              background:
+                "linear-gradient(140deg, rgba(59,130,246,.25) 0%, transparent 45%, rgba(59,130,246,.1) 100%)",
+            }}
+          />
+
+          {/* Card body */}
+          <div
+            style={{
+              borderRadius: "17px",
+              background: "linear-gradient(160deg, rgba(13,20,38,.97) 0%, rgba(7,10,18,.99) 100%)",
+              border: "1px solid rgba(51,65,85,.55)",
+              boxShadow:
+                "0 30px 70px rgba(0,0,0,.65)," +
+                "0 0 0 1px rgba(59,130,246,.05)," +
+                "inset 0 1px 0 rgba(255,255,255,.04)",
+              overflow: "hidden",
+              position: "relative",
+            }}
           >
-            {/* Corner accents */}
-            <span className="corner c-tl" /><span className="corner c-tr" />
-            <span className="corner c-bl" /><span className="corner c-br" />
-
-            {/* Card body */}
+            {/* Top shimmer line */}
             <div
-              className="relative px-10 py-11"
+              aria-hidden="true"
               style={{
+                position: "absolute", top: 0, left: 0, right: 0, height: "1px",
                 background:
-                  "linear-gradient(165deg, rgba(22,19,11,0.98) 0%, rgba(11,10,8,0.99) 100%)",
+                  "linear-gradient(90deg, transparent, rgba(59,130,246,.45), transparent)",
               }}
-            >
-              {/* Inner inset highlight */}
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background:
-                    "linear-gradient(160deg, rgba(180,158,110,0.04) 0%, transparent 60%)",
-                }}
-              />
+            />
 
-              {/* ── Brand mark ── */}
-              <div className="anim-1 flex flex-col items-center gap-4 mb-9">
-                {/* Crest */}
+            <div style={{ padding: "48px 40px 44px" }}>
+
+              {/* ── Logo + title ── */}
+              <div className="a1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", marginBottom: "36px" }}>
                 <div
                   style={{
-                    width: "52px", height: "52px",
-                    border: "1px solid rgba(180,158,110,0.3)",
-                    background: "rgba(180,158,110,0.055)",
+                    width: "56px", height: "56px", borderRadius: "16px",
                     display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#60a5fa",
+                    background: "linear-gradient(135deg, rgba(37,99,235,.15), rgba(29,78,216,.07))",
+                    border: "1px solid rgba(59,130,246,.22)",
+                    boxShadow: "0 8px 28px rgba(37,99,235,.18), inset 0 1px 0 rgba(255,255,255,.06)",
                   }}
                 >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(180,158,110,0.8)" strokeWidth="1.25">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    <polyline points="9,12 11,14 15,10" strokeWidth="1.5"/>
-                  </svg>
+                  <IconShield />
                 </div>
 
-                <div className="text-center" style={{ lineHeight: 1 }}>
-                  <div
-                    className="display-font gold-shimmer"
-                    style={{ fontSize: "38px", fontWeight: 300, letterSpacing: "0.2em" }}
+                <div style={{ textAlign: "center" }}>
+                  <h1
+                    className="font-display"
+                    style={{ fontSize: "22px", fontWeight: 700, color: "#f1f5f9", letterSpacing: "-.5px", margin: 0 }}
                   >
-                    AURUM
-                  </div>
-                  <div
+                    Compliance Vault
+                  </h1>
+                  <p
                     style={{
-                      fontSize: "8.5px",
-                      letterSpacing: "0.38em",
-                      color: "rgba(180,158,110,0.35)",
-                      marginTop: "6px",
-                      textTransform: "uppercase",
+                      fontSize: "9.5px", letterSpacing: ".28em", textTransform: "uppercase",
+                      color: "rgba(100,116,139,.65)", marginTop: "6px",
                     }}
                   >
-                    Private Banking Group
-                  </div>
+                    Enterprise · Secure Portal
+                  </p>
                 </div>
               </div>
 
               {/* ── Divider ── */}
-              <div className="anim-2 flex items-center gap-3 mb-7">
-                <div className="divider-gold" />
-                <span style={{ fontSize: "8px", letterSpacing: "0.32em", color: "rgba(180,158,110,0.28)", textTransform: "uppercase" }}>
-                  Secure Portal
+              <div className="a2" style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+                <div className="divider" />
+                <span style={{ fontSize: "9px", letterSpacing: ".28em", textTransform: "uppercase", color: "rgba(71,85,105,.75)", whiteSpace: "nowrap" }}>
+                  Sign In
                 </span>
-                <div className="divider-gold" />
+                <div className="divider" />
               </div>
 
               {/* ── Form ── */}
-              <form onSubmit={handleSubmit} noValidate>
+              <form onSubmit={handleSignIn} noValidate>
 
-                {/* Email field */}
-                <div className="anim-3" style={{ marginBottom: "18px" }}>
+                {/* Email */}
+                <div className="a3" style={{ marginBottom: "18px" }}>
                   <label
                     htmlFor="email"
                     style={{
                       display: "flex", alignItems: "center", gap: "7px",
-                      fontSize: "9.5px", letterSpacing: "0.24em",
-                      color: "rgba(180,158,110,0.5)",
-                      textTransform: "uppercase", marginBottom: "8px",
+                      fontSize: "9.5px", letterSpacing: ".22em", textTransform: "uppercase",
+                      color: "rgba(100,116,139,.75)", marginBottom: "8px",
                     }}
                   >
                     <IconMail /> Email Address
@@ -354,74 +346,69 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={e => { setEmail(e.target.value); setError(null); }}
-                    placeholder="name@institution.com"
-                    className="gold-input w-full"
-                    style={{
-                      padding: "11px 14px",
-                      fontSize: "12.5px",
-                      letterSpacing: "0.04em",
-                      borderRadius: "1px",
-                      width: "100%",
-                      boxSizing: "border-box",
-                    }}
+                    placeholder="you@company.com"
+                    className="vault-input"
+                    style={{ padding: "11px 14px", fontSize: "13px", letterSpacing: ".03em", borderRadius: "10px" }}
                   />
                 </div>
 
-                {/* Password field */}
-                <div className="anim-4" style={{ marginBottom: "20px" }}>
+                {/* Password */}
+                <div className="a4" style={{ marginBottom: "20px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                     <label
                       htmlFor="password"
                       style={{
                         display: "flex", alignItems: "center", gap: "7px",
-                        fontSize: "9.5px", letterSpacing: "0.24em",
-                        color: "rgba(180,158,110,0.5)",
-                        textTransform: "uppercase",
+                        fontSize: "9.5px", letterSpacing: ".22em", textTransform: "uppercase",
+                        color: "rgba(100,116,139,.75)",
                       }}
                     >
-                      <IconLock /> Passphrase
+                      <IconLock /> Password
                     </label>
-                    <a href="#" className="link-gold">Forgot?</a>
+                    <a href="#" className="link-sm">Forgot password?</a>
                   </div>
                   <div style={{ position: "relative" }}>
                     <input
                       id="password"
-                      type={showPass ? "text" : "password"}
+                      type={showPw ? "text" : "password"}
                       autoComplete="current-password"
                       required
                       value={password}
                       onChange={e => { setPassword(e.target.value); setError(null); }}
                       placeholder="••••••••••••"
-                      className="gold-input w-full"
+                      className="vault-input"
                       style={{
-                        padding: "11px 42px 11px 14px",
+                        padding: "11px 44px 11px 14px",
                         fontSize: "13px",
-                        letterSpacing: showPass ? "0.04em" : "0.18em",
-                        borderRadius: "1px",
-                        width: "100%",
-                        boxSizing: "border-box",
+                        letterSpacing: showPw ? ".03em" : ".16em",
+                        borderRadius: "10px",
                       }}
                     />
                     <button
                       type="button"
                       className="eye-btn"
-                      onClick={() => setShowPass(v => !v)}
-                      aria-label={showPass ? "Hide passphrase" : "Show passphrase"}
-                      style={{ position: "absolute", right: "13px", top: "50%", transform: "translateY(-50%)" }}
+                      onClick={() => setShowPw(v => !v)}
+                      aria-label={showPw ? "Hide password" : "Show password"}
                     >
-                      {showPass ? <IconEyeOpen /> : <IconEyeClosed />}
+                      {showPw ? <IconEyeOpen /> : <IconEyeClosed />}
                     </button>
                   </div>
                 </div>
 
-                {/* Error banner */}
+                {/* Error */}
                 {error && (
                   <div
-                    className="error-box"
+                    key={shakeKey}
+                    className="do-shake"
                     style={{
                       display: "flex", alignItems: "flex-start", gap: "9px",
                       padding: "10px 13px", marginBottom: "18px",
-                      fontSize: "11.5px", letterSpacing: "0.02em", borderRadius: "1px",
+                      background: "rgba(239,68,68,.07)",
+                      border: "1px solid rgba(239,68,68,.22)",
+                      borderRadius: "10px",
+                      color: "rgba(252,165,165,.9)",
+                      fontSize: "12px",
+                      letterSpacing: ".02em",
                     }}
                   >
                     <IconAlert />
@@ -429,72 +416,84 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Submit */}
-                <div className="anim-5">
+                {/* Sign In button */}
+                <div className="a5">
                   <button
                     type="submit"
                     disabled={loading || !email || !password}
-                    className="gold-btn w-full"
+                    className="vault-btn"
                     style={{
+                      width: "100%",
                       padding: "13px 24px",
-                      fontSize: "10px",
-                      letterSpacing: "0.28em",
-                      fontWeight: 500,
+                      borderRadius: "10px",
+                      border: "none",
+                      fontSize: "11px",
+                      letterSpacing: ".2em",
+                      fontWeight: 600,
                       textTransform: "uppercase",
-                      borderRadius: "1px",
+                      color: "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "10px",
-                      width: "100%",
-                      border: "none",
+                      cursor: loading || !email || !password ? "not-allowed" : "pointer",
                     }}
                   >
                     {loading ? (
-                      <><IconSpinner />Authenticating</>
+                      <>
+                        <svg
+                          className="spin-ring"
+                          width="15" height="15" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="2.5"
+                        >
+                          <path strokeLinecap="round" d="M12 3a9 9 0 1 0 9 9" />
+                        </svg>
+                        Authenticating
+                      </>
                     ) : (
-                      <><IconLock />Access Account</>
+                      <>
+                        <IconLock />
+                        Sign In
+                      </>
                     )}
                   </button>
                 </div>
               </form>
 
-              {/* ── Security badge ── */}
+              {/* Security badge */}
               <div
-                className="anim-6"
+                className="a6"
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   gap: "7px", marginTop: "28px",
-                  color: "rgba(180,158,110,0.2)",
+                  color: "rgba(51,65,85,.7)",
                 }}
               >
-                <IconShield />
-                <span style={{ fontSize: "8.5px", letterSpacing: "0.18em", textTransform: "uppercase" }}>
-                  256-bit TLS · SOC 2 Type II Certified
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round"
+                    d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25z" />
+                </svg>
+                <span style={{ fontSize: "9px", letterSpacing: ".2em", textTransform: "uppercase" }}>
+                  256-bit TLS · SOC 2 Type II
                 </span>
               </div>
 
             </div>
           </div>
 
-          {/* Session reference line */}
-          <div
+          {/* Session token line */}
+          <p
             style={{
-              marginTop: "14px",
-              textAlign: "center",
-              fontSize: "8.5px",
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              color: "rgba(180,158,110,0.12)",
+              textAlign: "center", marginTop: "14px",
+              fontSize: "9px", letterSpacing: ".2em", textTransform: "uppercase",
+              color: "rgba(30,41,59,.7)",
             }}
           >
-            Session · {
-              typeof window !== "undefined"
-                ? Math.random().toString(36).slice(2, 10).toUpperCase()
-                : "--------"
-            }
-          </div>
-
+            Session ·{" "}
+            {typeof window !== "undefined"
+              ? Math.random().toString(36).slice(2, 10).toUpperCase()
+              : "--------"}
+          </p>
         </div>
       </div>
     </>
